@@ -7,6 +7,7 @@
 #define NUM_COURSES 10
 #define NUM_LEVELS 12
 #define NUM_CLASSES 10
+#define NUM_OF_EXCELLENCE 10
 
 struct student {
     char first_name[NAMELEN];
@@ -21,6 +22,15 @@ struct student {
 struct school {
     struct student* DB[NUM_LEVELS][NUM_CLASSES];
 };
+
+struct max_grades_course {
+    struct student* stud;
+    struct max_grades_course* next;
+};
+
+
+static struct max_grades_course* max_grades[NUM_COURSES][NUM_LEVELS];
+
 static struct school school_data;
 
 void init_DB();
@@ -35,7 +45,7 @@ void insert_student_to_school(struct student* new_student, int level, int class)
 int main() {
 
     init_DB();
-//    menu();
+    menu();
     print_students();
 
 
@@ -126,6 +136,7 @@ void print_students() {
 void insert_student_to_school(struct student* new_student, int level, int class) {
     struct student* current = school_data.DB[level - 1][class - 1];
     struct student* prev = NULL;
+    struct max_grades_course* curr_max;
 
     // Find the appropriate position to insert the new student based on the average
     while (current != NULL && current->avg >= new_student->avg) {
@@ -143,6 +154,62 @@ void insert_student_to_school(struct student* new_student, int level, int class)
         // Insert the new student between prev and current
         prev->next = new_student;
         new_student->next = current;
+    }
+    for (int i = 0; i < NUM_COURSES; i++) {
+        curr_max = max_grades[i][level - 1];
+
+        // Add new student if list is empty or if the student's grade is higher than the current max grade.
+        if (curr_max == NULL || new_student->courses[i] > curr_max->stud->courses[i]) {
+            // Add new student to the front of the list.
+            struct max_grades_course* new_max_grade = (struct max_grades_course*)malloc(sizeof(struct max_grades_course));
+            if (new_max_grade == NULL) {
+                printf("Memory allocation error!\n");
+                exit(1);
+            }
+            new_max_grade->stud = new_student;
+            new_max_grade->next = curr_max;
+            max_grades[i][level - 1] = new_max_grade;
+        } else {
+            // Search for the right spot to add the student while keeping track of the list size.
+            struct max_grades_course* prev_max = curr_max;
+            int list_size = 1;
+
+            while (curr_max->next != NULL && curr_max->next->stud->courses[i] >= new_student->courses[i]) {
+                prev_max = curr_max;
+                curr_max = curr_max->next;
+                list_size++;
+            }
+
+            // If the student's grade is high enough, add them to the list.
+            if (curr_max->next == NULL || curr_max->next->stud->courses[i] < new_student->courses[i]) {
+                struct max_grades_course* new_max_grade = (struct max_grades_course*)malloc(sizeof(struct max_grades_course));
+                if (new_max_grade == NULL) {
+                    printf("Memory allocation error!\n");
+                    exit(1);
+                }
+                new_max_grade->stud = new_student;
+                new_max_grade->next = curr_max->next;
+                curr_max->next = new_max_grade;
+                list_size++;
+            }
+
+            // If the list size is now over 10, remove students from the end.
+            while (list_size > NUM_OF_EXCELLENCE) {
+                prev_max = max_grades[i][level - 1];
+                curr_max = prev_max->next;
+
+                // Find the second to last node.
+                while (curr_max->next != NULL) {
+                    prev_max = curr_max;
+                    curr_max = curr_max->next;
+                }
+
+                // Remove the last node.
+                free(curr_max);
+                prev_max->next = NULL;
+                list_size--;
+            }
+        }
     }
 }
 
@@ -174,7 +241,7 @@ void menu(){
         printf("please input your option:"
                "0: exit, "
                "1: register, 2: get excellent students, "
-               "3: get candidates for departure, 4: Average calculation per course per class");
+               "3: get candidates for departure, 4: Average calculation per course per class\n");
 
         scanf("%d", &option);
     }
@@ -219,9 +286,23 @@ void get_worst_students(){
 
 
 }
-void get_excellent_students(){
+void get_excellent_students() {
+    struct max_grades_course* current;
 
+    for (int i = 0; i < NUM_COURSES; i++) {
+        for (int j = 0; j < NUM_LEVELS; j++) {
+            printf("\nCourse %d, Level %d:\n", i + 1, j + 1);
+            current = max_grades[i][j];
+            while (current != NULL) {
+                printf("Student: %s %s, Grade: %d\n",
+                       current->stud->first_name, current->stud->last_name,
+                       current->stud->courses[i]);
+                current = current->next;
+            }
+        }
+    }
 }
+
 void get_avg_per_class(){
 
 }
