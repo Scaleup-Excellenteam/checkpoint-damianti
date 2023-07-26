@@ -1,0 +1,3 @@
+/Users/damiantissembaum/CLionProjects/checkpoint1/cmake-build-debug/CMakeFiles/checkpoint1.dir
+/Users/damiantissembaum/CLionProjects/checkpoint1/cmake-build-debug/CMakeFiles/edit_cache.dir
+/Users/damiantissembaum/CLionProjects/checkpoint1/cmake-build-debug/CMakeFiles/rebuild_cache.dir
