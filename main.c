@@ -41,6 +41,8 @@ void get_worst_students();
 void get_excellent_students();
 void get_avg_per_class();
 void insert_student_to_school(struct student* new_student, int level, int class);
+void free_students();
+void free_max_grades();
 
 int main() {
 
@@ -48,7 +50,8 @@ int main() {
     menu();
     print_students();
 
-
+    free_students();
+    free_max_grades();
     return 0;
 }
 
@@ -215,10 +218,9 @@ void insert_student_to_school(struct student* new_student, int level, int class)
 
 void menu(){
     int option;
-    printf("Welcome to the menu, please input your option:"
-           "0: exit, "
-           "1: register, 2: get excellent students, "
-           "3: get candidates for departure, 4: Average calculation per course per class");
+    printf("Welcome to the menu, please select an option:\n "
+           "0: exit\n 1: register \n 2: get excellent students. \n "
+           "3: get candidates for departure \n 4: Average calculation per course per class\n");
 
     scanf("%d", &option);
     while (option != 0){
@@ -236,7 +238,7 @@ void menu(){
                 get_avg_per_class();
                 break;
             default:
-                printf("wrong option");
+                printf("wrong option\n");
         }
         printf("please input your option:"
                "0: exit, "
@@ -305,4 +307,42 @@ void get_excellent_students() {
 
 void get_avg_per_class(){
 
+}
+
+
+void free_students(){
+    int level;
+    for (level = 0; level < NUM_LEVELS; ++level){
+        int class;
+        for (class = 0; class < NUM_CLASSES; ++class){
+            struct student* current = school_data.DB[level][class];
+            struct student* next;
+            while (current != NULL){
+                next = current->next;
+                free(current);
+                current = next;
+            }
+        }
+
+
+
+    }
+
+
+}
+void free_max_grades(){
+    int course;
+    for (course = 0; course < NUM_COURSES; ++course){
+        int level;
+        for (level = 0; level < NUM_LEVELS; ++level){
+            struct max_grades_course* current = max_grades[course][level];
+            struct max_grades_course* next;
+            while (current != NULL){
+                next = current->next;
+                free(current);
+                current = next;
+            }
+
+        }
+    }
 }
