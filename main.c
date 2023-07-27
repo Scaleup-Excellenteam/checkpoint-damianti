@@ -142,7 +142,7 @@ void insert_student_to_school(struct student* new_student, int level, int class)
     struct max_grades_course* curr_max;
 
     // Find the appropriate position to insert the new student based on the average
-    while (current != NULL && current->avg >= new_student->avg) {
+    while (current != NULL && current->avg < new_student->avg) {
         prev = current;
         current = current->next;
     }
@@ -285,7 +285,18 @@ void register_student(){
 
 
 void get_worst_students(){
+    fprintf(stdout, "criteria of potential students to leave school: worst student of each class with avg smaller than 70\n");
+    int level;
+    for (level=0; level<NUM_LEVELS; ++level){
+        int course;
+        for (course=0; course<NUM_COURSES; ++course){
+            struct student* stud = school_data.DB[level][course];
+            if (stud != NULL && stud->avg < 70) {
+                fprintf(stdout, "level: %d, course: %d, name: %s %s, avg: %f\n", level, course, stud->first_name, stud->last_name, stud->avg);
+            }
 
+        }
+    }
 
 }
 void get_excellent_students() {
@@ -306,6 +317,7 @@ void get_excellent_students() {
 }
 
 void get_avg_per_class(){
+
 
 }
 
