@@ -15,6 +15,8 @@ struct student {
     char cellphone[CELLPHONE_LEN];
     int courses[NUM_COURSES];
     double avg;
+    int level;
+    int class;
     struct student* next;
     struct student* prev;
 };
@@ -28,9 +30,14 @@ struct max_grades_course {
     struct max_grades_course* next;
 };
 
+struct names_ordered_studs{
+    struct student* stud;
+    struct names_ordered_studs* left;
+    struct names_ordered_studs* right;
+};
 
 static struct max_grades_course* max_grades[NUM_COURSES][NUM_LEVELS];
-
+static struct names_ordered_studs* students_by_name;
 static struct school school_data;
 
 void init_DB();
@@ -40,15 +47,19 @@ void menu();
 void get_worst_students();
 void get_excellent_students();
 void get_avg_per_class();
-void insert_student_to_school(struct student* new_student, int level, int class);
+void insert_student_to_school(struct student* new_student);
+void insert_student_to_names_ordered_db(struct student* new_student);
 void free_students();
 void free_max_grades();
+struct names_ordered_studs* create_names_ordered_stud(struct student *new_student);
+
 
 int main() {
 
     init_DB();
     menu();
     print_students();
+
 
     free_students();
     free_max_grades();
@@ -73,13 +84,17 @@ void init_DB() {
 
         struct student* new_student = (struct student*)malloc(sizeof(struct student));
         if (new_student == NULL) {
-            printf("Memory allocation error!\n");
+            fprintf(stderr,"Memory allocation error!\n");
+            free_students();
+            free_max_grades();
             exit(1);
         }
 
         strcpy(new_student->first_name, first_name);
         strcpy(new_student->last_name, last_name);
         strcpy(new_student->cellphone, cellphone);
+        new_student->level = level;
+        new_student->class = class;
 
         double sum = 0;
 
@@ -97,19 +112,8 @@ void init_DB() {
         new_student->prev = NULL;
 
 
-        insert_student_to_school(new_student, level, class);
-
-
-        // Insert the student into the school_data structure based on level and class
-//        if (school_data.DB[level - 1][class - 1] == NULL) {
-//            school_data.DB[level - 1][class - 1] = new_student;
-//        } else {
-//            struct student* current = school_data.DB[level - 1][class - 1];
-//            while (current->next != NULL) {
-//                current = current->next;
-//            }
-//            current->next = new_student;
-//        }
+        insert_student_to_school(new_student);
+        insert_student_to_names_ordered_db(new_student);
     }
 
     fclose(file);
@@ -136,8 +140,8 @@ void print_students() {
         }
     }
 }
-void insert_student_to_school(struct student* new_student, int level, int class) {
-    struct student* current = school_data.DB[level - 1][class - 1];
+void insert_student_to_school(struct student* new_student) {
+    struct student* current = school_data.DB[new_student->level - 1][new_student->class - 1];
     struct student* prev = NULL;
     struct max_grades_course* curr_max;
 
@@ -151,15 +155,15 @@ void insert_student_to_school(struct student* new_student, int level, int class)
     if (prev == NULL) {
         // If prev is NULL, the new student has the highest average,
         // so it becomes the new head of the linked list.
-        new_student->next = school_data.DB[level - 1][class - 1];
-        school_data.DB[level - 1][class - 1] = new_student;
+        new_student->next = school_data.DB[new_student->level - 1][new_student->class - 1];
+        school_data.DB[new_student->level - 1][new_student->class - 1] = new_student;
     } else {
         // Insert the new student between prev and current
         prev->next = new_student;
         new_student->next = current;
     }
     for (int i = 0; i < NUM_COURSES; i++) {
-        curr_max = max_grades[i][level - 1];
+        curr_max = max_grades[i][new_student->level - 1];
 
         // Add new student if list is empty or if the student's grade is higher than the current max grade.
         if (curr_max == NULL || new_student->courses[i] > curr_max->stud->courses[i]) {
@@ -171,7 +175,7 @@ void insert_student_to_school(struct student* new_student, int level, int class)
             }
             new_max_grade->stud = new_student;
             new_max_grade->next = curr_max;
-            max_grades[i][level - 1] = new_max_grade;
+            max_grades[i][new_student->level - 1] = new_max_grade;
         } else {
             // Search for the right spot to add the student while keeping track of the list size.
             struct max_grades_course* prev_max = curr_max;
@@ -198,7 +202,7 @@ void insert_student_to_school(struct student* new_student, int level, int class)
 
             // If the list size is now over 10, remove students from the end.
             while (list_size > NUM_OF_EXCELLENCE) {
-                prev_max = max_grades[i][level - 1];
+                prev_max = max_grades[i][new_student->level - 1];
                 curr_max = prev_max->next;
 
                 // Find the second to last node.
@@ -267,9 +271,9 @@ void register_student(){
     printf("Enter Cellphone: ");
     scanf("%s", new_student->cellphone);
     printf("Enter level Number: ");
-    scanf("%d", &class_num);
+    scanf("%d", &new_student->level);
     printf("Enter Class Number: ");
-    scanf("%d", &level_num);
+    scanf("%d", &new_student->class);
 
     double sum = 0;
     for (int i = 0; i < NUM_COURSES; i++) {
@@ -279,7 +283,7 @@ void register_student(){
     }
     new_student->avg = (double) sum / NUM_COURSES;
 
-    insert_student_to_school(new_student, level_num, class_num);
+    insert_student_to_school(new_student);
 
 }
 
@@ -357,4 +361,53 @@ void free_max_grades(){
 
         }
     }
+}
+
+void insert_student_to_names_ordered_db(struct student *new_student) {
+    struct names_ordered_studs* head = students_by_name;
+    if (head == NULL){
+        head = create_names_ordered_stud(new_student);
+    }
+    else {
+        while (head != NULL){
+            int result = strcmp(new_student->first_name,head->stud->first_name);
+            if (result < 0) {
+                head = head->left;
+                continue;
+            }
+            else if (result > 0){
+                head = head->right;
+                continue;
+            }
+            else{
+                int result = strcmp(new_student->last_name,head->stud->last_name);
+                if (result < 0) {
+                    head = head->left;
+                    continue;
+                }
+                else if (result > 0){
+                    head = head->right;
+                    continue;
+                }
+
+                else{
+                    head = head->right;
+                }
+
+            }
+        }
+        head = create_names_ordered_stud(new_student);
+
+    }
+
+}
+
+
+struct names_ordered_studs* create_names_ordered_stud(struct student *new_student){
+    struct names_ordered_studs* new_node = (struct names_ordered_studs*) malloc(sizeof (struct names_ordered_studs));
+    new_node->stud = new_student;
+    new_node->left = NULL;
+    new_node->right = NULL;
+    return new_node;
+
 }
