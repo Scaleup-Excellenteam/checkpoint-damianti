@@ -2,6 +2,7 @@
 #include <stdlib.h>
 #include <string.h>
 
+
 #define NAMELEN 50
 #define CELLPHONE_LEN 50
 #define NUM_COURSES 10
@@ -43,15 +44,27 @@ static struct school school_data;
 void init_DB();
 void register_student();
 void print_students();
+void print_student_data(const struct student* stud);
 void menu();
 void get_worst_students();
 void get_excellent_students();
 void get_avg_per_class();
 void insert_student_to_school(struct student* new_student);
-void insert_student_to_names_ordered_db(struct student* new_student);
 void free_students();
 void free_max_grades();
 struct names_ordered_studs* create_names_ordered_stud(struct student *new_student);
+void insert_student_to_names_ordered_db_recursive(struct names_ordered_studs** head_ref, struct student *new_student);
+struct student*  find_student(const char* first_name, const char* last_name);
+void remove_student_by_name();
+struct student* find_student_by_name();
+void remove_stud_from_ds(struct student* stud);
+void remove_student_from_students_by_name(struct student* stud);
+void remove_student_from_max_grades(struct student* stud);
+void remove_student_from_school(struct student* stud);
+struct names_ordered_studs* deleteMaxNode(struct names_ordered_studs* root, struct names_ordered_studs* maxNode);
+struct names_ordered_studs* delete_node(struct names_ordered_studs* root, struct student* stud);
+struct names_ordered_studs* getMaxNode(struct names_ordered_studs* root);
+
 
 
 int main() {
@@ -113,28 +126,31 @@ void init_DB() {
 
 
         insert_student_to_school(new_student);
-        insert_student_to_names_ordered_db(new_student);
+        insert_student_to_names_ordered_db_recursive(&students_by_name, new_student);
     }
 
     fclose(file);
 }
+void print_student_data(const struct student* stud){
 
+    printf("Level %d, Class %d\n", stud->level + 1, stud->class + 1);
+    printf("First Name: %s\n", stud->first_name);
+    printf("Last Name: %s\n", stud->last_name);
+    printf("Cellphone: %s\n", stud->cellphone);
+    printf("Grades: ");
+    for (int i = 0; i < NUM_COURSES; i++) {
+        printf("%d ", stud->courses[i]);
+    }
+    printf("\nAverage grade: %f\n", stud->avg);
+}
 
 void print_students() {
     for (int level = 0; level < NUM_LEVELS; level++) {
         for (int class = 0; class < NUM_CLASSES; class++) {
             struct student* current = school_data.DB[level][class];
             while (current != NULL) {
-                printf("Level %d, Class %d\n", level + 1, class + 1);
-                printf("First Name: %s\n", current->first_name);
-                printf("Last Name: %s\n", current->last_name);
-                printf("Cellphone: %s\n", current->cellphone);
-                printf("Grades: ");
-                for (int i = 0; i < NUM_COURSES; i++) {
-                    printf("%d ", current->courses[i]);
-                }
-                printf("\nAverage grade: %f\n", current->avg);
-                printf("\n\n");
+                print_student_data(current);
+
                 current = current->next;
             }
         }
@@ -222,9 +238,12 @@ void insert_student_to_school(struct student* new_student) {
 
 void menu(){
     int option;
-    printf("Welcome to the menu, please select an option:\n "
-           "0: exit\n 1: register \n 2: get excellent students. \n "
-           "3: get candidates for departure \n 4: Average calculation per course per class\n");
+    printf("Welcome to the menu, pleaseֿ\n");
+    printf("please input your option:"
+           "0: exit, "
+           "1: register, 2: get excellent students, "
+           "3: get candidates for departure, 4: Average calculation per course per class\n"
+           "5: Find a student by name\n");
 
     scanf("%d", &option);
     while (option != 0){
@@ -241,13 +260,19 @@ void menu(){
             case 4:
                 get_avg_per_class();
                 break;
+            case 5:
+                find_student_by_name();
+                break;
+            case 6:
+                remove_student_by_name();
             default:
                 printf("wrong option\n");
         }
         printf("please input your option:"
                "0: exit, "
                "1: register, 2: get excellent students, "
-               "3: get candidates for departure, 4: Average calculation per course per class\n");
+               "3: get candidates for departure, 4: Average calculation per course per class\n"
+               "5: Find a student by name\n, 6: remove a student by name");
 
         scanf("%d", &option);
     }
@@ -340,8 +365,6 @@ void free_students(){
             }
         }
 
-
-
     }
 
 
@@ -363,51 +386,215 @@ void free_max_grades(){
     }
 }
 
-void insert_student_to_names_ordered_db(struct student *new_student) {
-    struct names_ordered_studs* head = students_by_name;
-    if (head == NULL){
-        head = create_names_ordered_stud(new_student);
+void insert_student_to_names_ordered_db_recursive(struct names_ordered_studs** head_ref, struct student *new_student) {
+    if (*head_ref == NULL) {
+        *head_ref = create_names_ordered_stud(new_student);
+        return;
     }
-    else {
-        while (head != NULL){
-            int result = strcmp(new_student->first_name,head->stud->first_name);
+
+    int result = strcmp(new_student->first_name, (*head_ref)->stud->first_name);
+    if (result < 0) {
+        insert_student_to_names_ordered_db_recursive(&((*head_ref)->left), new_student);
+    } else if (result > 0) {
+
+        insert_student_to_names_ordered_db_recursive(&((*head_ref)->right), new_student);
+    } else {
+
+        result = strcmp(new_student->last_name, (*head_ref)->stud->last_name);
+        if (result < 0) {
+            insert_student_to_names_ordered_db_recursive(&((*head_ref)->left), new_student);
+        } else {
+            insert_student_to_names_ordered_db_recursive(&((*head_ref)->right), new_student);
+        }
+    }
+}
+
+
+struct names_ordered_studs* create_names_ordered_stud(struct student *new_student) {
+    struct names_ordered_studs* new_node = (struct names_ordered_studs*)malloc(sizeof(struct names_ordered_studs));
+    if (new_node == NULL) {
+        printf("Memory allocation error!\n");
+        exit(1);
+    }
+    new_node->stud = new_student;
+    new_node->left = NULL;
+    new_node->right = NULL;
+
+    return new_node;
+}
+
+struct student* find_student(const char* first_name, const char* last_name) {
+
+    struct names_ordered_studs* current = students_by_name;
+    struct student* found_student = NULL;
+
+    while (current != NULL) {
+        int result = strcmp(first_name, current->stud->first_name);
+        if (result < 0) {
+            current = current->left;
+        } else if (result > 0) {
+            current = current->right;
+        } else {
+            result = strcmp(last_name, current->stud->last_name);
             if (result < 0) {
-                head = head->left;
-                continue;
-            }
-            else if (result > 0){
-                head = head->right;
-                continue;
-            }
-            else{
-                int result = strcmp(new_student->last_name,head->stud->last_name);
-                if (result < 0) {
-                    head = head->left;
-                    continue;
-                }
-                else if (result > 0){
-                    head = head->right;
-                    continue;
-                }
-
-                else{
-                    head = head->right;
-                }
-
+                current = current->left;
+            } else if (result > 0) {
+                current = current->right;
+            } else {
+                found_student = current->stud;
+                break;
             }
         }
-        head = create_names_ordered_stud(new_student);
+    }
 
+    return found_student;
+}
+
+
+void remove_student_by_name() {
+    char option;
+    struct student* stud = find_student_by_name();
+    if (stud)
+        remove_stud_from_ds(stud);
+
+
+}
+
+struct student* find_student_by_name(){
+
+    char first_name[NAMELEN], last_name[NAMELEN];
+    printf("Enter the first name of the student: ");
+    scanf("%s", first_name);
+    printf("Enter the last name of the student: ");
+    scanf("%s", last_name);
+    struct student* found_student = find_student(first_name, last_name);
+
+    if (found_student != NULL) {
+        print_student_data(found_student);
+        return found_student;
+    } else {
+        printf("Could not find a student with the name %s %s\n", first_name, last_name);
+        return NULL;
     }
 
 }
 
+void remove_stud_from_ds(struct student* stud){
 
-struct names_ordered_studs* create_names_ordered_stud(struct student *new_student){
-    struct names_ordered_studs* new_node = (struct names_ordered_studs*) malloc(sizeof (struct names_ordered_studs));
-    new_node->stud = new_student;
-    new_node->left = NULL;
-    new_node->right = NULL;
-    return new_node;
+    remove_student_from_max_grades(stud);
+    remove_student_from_students_by_name(stud);
+    remove_student_from_school(stud);
 
+
+}
+
+void remove_student_from_max_grades(struct student* stud){
+    int course;
+    for (course = 0; course< NUM_COURSES; ++course){
+
+        struct max_grades_course* grade = max_grades[course][stud->level];
+        struct max_grades_course* prev = NULL;
+
+        while (grade != NULL){
+            if (grade->stud == stud){
+                if (prev==NULL){
+                    prev = grade;
+                    max_grades[course][stud->level] = grade->next;
+                }
+                else{
+                    prev->next = grade->next;
+                }
+                free(grade);
+                break;
+            }
+            prev = grade;
+            grade = grade->next;
+        }
+    }
+
+}
+
+void remove_student_from_school(struct student* wanted_stud) {
+
+    struct student* stud = school_data.DB[wanted_stud->level-1][wanted_stud->class-1];
+    struct student* prev = NULL;
+
+    while (stud != NULL){
+        if (stud == wanted_stud){
+            printf("FOUND IT!!");
+            if (prev == NULL){
+                prev = stud;
+                school_data.DB[wanted_stud->level-1][wanted_stud->class-1] = stud->next;
+            }
+            else{
+                prev->next = stud->next;
+            }
+            free(stud);
+            break;
+        }
+        prev = stud;
+        stud = stud->next;
+    }
+}
+
+struct names_ordered_studs* deleteMaxNode(struct names_ordered_studs* root, struct names_ordered_studs* maxNode) {
+    if(root == NULL)
+        return NULL;
+
+    if(root == maxNode) {
+        return root->left;
+    }
+
+    root->right = deleteMaxNode(root->right, maxNode);
+    return root;
+}
+
+struct names_ordered_studs* getMaxNode(struct names_ordered_studs* root) {
+    while(root->right != NULL) {
+        root = root->right;
+    }
+
+    return root;
+}
+
+struct names_ordered_studs* delete_node(struct names_ordered_studs* root, struct student* stud) {
+    if(root == NULL)
+        return NULL;
+
+    // Assume the students are ordered by last name then first name
+    int compare = strcmp(stud->last_name, root->stud->last_name);
+    if(compare == 0)
+        compare = strcmp(stud->first_name, root->stud->first_name);
+
+    if(compare < 0)
+        root->left = delete_node(root->left, stud);
+    else if(compare > 0)
+        root->right = delete_node(root->right, stud);
+    else {
+        if(root->left == NULL && root->right == NULL) {
+            free(root);
+            return NULL;
+        }
+        else if(root->left == NULL) {
+            struct names_ordered_studs* temp = root->right;
+            free(root);
+            return temp;
+        }
+        else if(root->right == NULL) {
+            struct names_ordered_studs* temp = root->left;
+            free(root);
+            return temp;
+        }
+        else {
+            struct names_ordered_studs* temp = getMaxNode(root->left);
+            root->stud = temp->stud;
+            root->left = deleteMaxNode(root->left, temp);
+        }
+    }
+
+    return root;
+}
+
+void remove_student_from_students_by_name(struct student* stud) {
+    students_by_name = delete_node(students_by_name, stud);
 }
