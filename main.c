@@ -51,8 +51,10 @@ void get_excellent_students();
 void get_avg_per_class();
 void insert_student_to_school(struct student* new_student);
 void free_students();
+void free_ordered_by_name_studs(struct names_ordered_studs* root);
 void free_max_grades();
 struct names_ordered_studs* create_names_ordered_stud(struct student *new_student);
+void insert_student_to_list_of_grades(struct student *new_student);
 void insert_student_to_names_ordered_db_recursive(struct names_ordered_studs** head_ref, struct student *new_student);
 struct student*  find_student(const char* first_name, const char* last_name);
 void remove_student_by_name();
@@ -75,7 +77,9 @@ int main() {
 
 
     free_students();
+    free_ordered_by_name_studs(students_by_name);
     free_max_grades();
+
     return 0;
 }
 
@@ -126,6 +130,7 @@ void init_DB() {
 
 
         insert_student_to_school(new_student);
+        insert_student_to_list_of_grades(new_student);
         insert_student_to_names_ordered_db_recursive(&students_by_name, new_student);
     }
 
@@ -161,89 +166,87 @@ void insert_student_to_school(struct student* new_student) {
     struct student* prev = NULL;
     struct max_grades_course* curr_max;
 
-    // Find the appropriate position to insert the new student based on the average
+
     while (current != NULL && current->avg < new_student->avg) {
         prev = current;
         current = current->next;
     }
 
-    // Insert the new student in the linked list
     if (prev == NULL) {
-        // If prev is NULL, the new student has the highest average,
-        // so it becomes the new head of the linked list.
+        // If prev is NULL, the new student has the lowest average
         new_student->next = school_data.DB[new_student->level - 1][new_student->class - 1];
         school_data.DB[new_student->level - 1][new_student->class - 1] = new_student;
     } else {
-        // Insert the new student between prev and current
         prev->next = new_student;
         new_student->next = current;
     }
+
+
+}
+
+void insert_student_to_list_of_grades(struct student *new_student) {
+
     for (int i = 0; i < NUM_COURSES; i++) {
-        curr_max = max_grades[i][new_student->level - 1];
+        struct max_grades_course* new_grade = (struct max_grades_course*)malloc(sizeof(struct max_grades_course));
+        if (new_grade == NULL) {
+            printf("Memory allocation error!\n");
+            exit(1);
+        }
+        new_grade->stud = new_student;
+        struct max_grades_course* current = max_grades[i][new_student->level - 1];
+        struct max_grades_course* prev = NULL;
 
-        // Add new student if list is empty or if the student's grade is higher than the current max grade.
-        if (curr_max == NULL || new_student->courses[i] > curr_max->stud->courses[i]) {
-            // Add new student to the front of the list.
-            struct max_grades_course* new_max_grade = (struct max_grades_course*)malloc(sizeof(struct max_grades_course));
-            if (new_max_grade == NULL) {
-                printf("Memory allocation error!\n");
-                exit(1);
-            }
-            new_max_grade->stud = new_student;
-            new_max_grade->next = curr_max;
-            max_grades[i][new_student->level - 1] = new_max_grade;
+        while (current != NULL && new_student->courses[i] <= current->stud->courses[i]){
+            prev = current;
+            current = current->next;
+        }
+
+        if (prev == NULL){
+
+            new_grade->next = max_grades[i][new_student->level - 1];
+            max_grades[i][new_student->level - 1] = new_grade;
+        }
+        else{
+            prev->next = new_grade;
+            new_grade->next = current;
+        }
+
+    }
+}
+
+
+void insert_student_to_names_ordered_db_recursive(struct names_ordered_studs** head_ref, struct student *new_student) {
+    if (*head_ref == NULL) {
+        *head_ref = create_names_ordered_stud(new_student);
+        return;
+    }
+
+    int result = strcmp(new_student->first_name, (*head_ref)->stud->first_name);
+    if (result < 0) {
+        insert_student_to_names_ordered_db_recursive(&((*head_ref)->left), new_student);
+    } else if (result > 0) {
+
+        insert_student_to_names_ordered_db_recursive(&((*head_ref)->right), new_student);
+    } else {
+
+        result = strcmp(new_student->last_name, (*head_ref)->stud->last_name);
+        if (result < 0) {
+            insert_student_to_names_ordered_db_recursive(&((*head_ref)->left), new_student);
         } else {
-            // Search for the right spot to add the student while keeping track of the list size.
-            struct max_grades_course* prev_max = curr_max;
-            int list_size = 1;
-
-            while (curr_max->next != NULL && curr_max->next->stud->courses[i] >= new_student->courses[i]) {
-                prev_max = curr_max;
-                curr_max = curr_max->next;
-                list_size++;
-            }
-
-            // If the student's grade is high enough, add them to the list.
-            if (curr_max->next == NULL || curr_max->next->stud->courses[i] < new_student->courses[i]) {
-                struct max_grades_course* new_max_grade = (struct max_grades_course*)malloc(sizeof(struct max_grades_course));
-                if (new_max_grade == NULL) {
-                    printf("Memory allocation error!\n");
-                    exit(1);
-                }
-                new_max_grade->stud = new_student;
-                new_max_grade->next = curr_max->next;
-                curr_max->next = new_max_grade;
-                list_size++;
-            }
-
-            // If the list size is now over 10, remove students from the end.
-            while (list_size > NUM_OF_EXCELLENCE) {
-                prev_max = max_grades[i][new_student->level - 1];
-                curr_max = prev_max->next;
-
-                // Find the second to last node.
-                while (curr_max->next != NULL) {
-                    prev_max = curr_max;
-                    curr_max = curr_max->next;
-                }
-
-                // Remove the last node.
-                free(curr_max);
-                prev_max->next = NULL;
-                list_size--;
-            }
+            insert_student_to_names_ordered_db_recursive(&((*head_ref)->right), new_student);
         }
     }
 }
 
+
 void menu(){
     int option;
-    printf("Welcome to the menu, pleaseֿ\n");
+    printf("Welcome to the menu\n");
     printf("please input your option:"
-           "0: exit, "
-           "1: register, 2: get excellent students, "
-           "3: get candidates for departure, 4: Average calculation per course per class\n"
-           "5: Find a student by name\n");
+           "\n\t0: exit \n\t1: register a new student\n\t2: get excellent students from school"
+           "\n\t3: get candidates to kick out (worst students), \n\t4: Calculate for every class in school"
+           "\n\t5: Find a student by name\n\t6: Remove a student from school by name\n. Your option: ");
+
 
     scanf("%d", &option);
     while (option != 0){
@@ -269,10 +272,9 @@ void menu(){
                 printf("wrong option\n");
         }
         printf("please input your option:"
-               "0: exit, "
-               "1: register, 2: get excellent students, "
-               "3: get candidates for departure, 4: Average calculation per course per class\n"
-               "5: Find a student by name\n, 6: remove a student by name");
+               "\n\t0: exit \n\t1: register a new student\n\t2: get excellent students from school"
+               "\n\t3: get candidates to kick out (worst students), \n\t4: Calculate for every class in school"
+               "\n\t5: Find a student by name\n\t6: Remove a student from school by name\n. Your option: ");
 
         scanf("%d", &option);
     }
@@ -309,7 +311,8 @@ void register_student(){
     new_student->avg = (double) sum / NUM_COURSES;
 
     insert_student_to_school(new_student);
-
+    insert_student_to_list_of_grades(new_student);
+    insert_student_to_names_ordered_db_recursive(&students_by_name, new_student);
 }
 
 
@@ -335,20 +338,38 @@ void get_excellent_students() {
         for (int j = 0; j < NUM_LEVELS; j++) {
             printf("\nCourse %d, Level %d:\n", i + 1, j + 1);
             current = max_grades[i][j];
-            while (current != NULL) {
+            int counter = 0;
+            while (current != NULL || counter < 10) {
                 printf("Student: %s %s, Grade: %d\n",
                        current->stud->first_name, current->stud->last_name,
                        current->stud->courses[i]);
                 current = current->next;
+                counter++;
             }
         }
     }
 }
 
-void get_avg_per_class(){
+void get_avg_per_class() {
+    for (int level = 0; level < NUM_LEVELS; level++) {
+        for (int class = 0; class < NUM_CLASSES; class++) {
+            struct student* current = school_data.DB[level][class];
+            double sum = 0;
+            int count = 0;
 
+            while (current != NULL) {
+                sum += current->avg;
+                count++;
+                current = current->next;
+            }
 
+            double avg = count > 0 ? sum / count : 0;
+
+            printf("Level %d, Class %d: Average grade: %f\n", level + 1, class + 1, avg);
+        }
+    }
 }
+
 
 
 void free_students(){
@@ -386,27 +407,14 @@ void free_max_grades(){
     }
 }
 
-void insert_student_to_names_ordered_db_recursive(struct names_ordered_studs** head_ref, struct student *new_student) {
-    if (*head_ref == NULL) {
-        *head_ref = create_names_ordered_stud(new_student);
+void free_ordered_by_name_studs(struct names_ordered_studs *root) {
+
+    if (root == NULL)
         return;
-    }
+    free_ordered_by_name_studs(root->right);
+    free_ordered_by_name_studs(root->left);
 
-    int result = strcmp(new_student->first_name, (*head_ref)->stud->first_name);
-    if (result < 0) {
-        insert_student_to_names_ordered_db_recursive(&((*head_ref)->left), new_student);
-    } else if (result > 0) {
-
-        insert_student_to_names_ordered_db_recursive(&((*head_ref)->right), new_student);
-    } else {
-
-        result = strcmp(new_student->last_name, (*head_ref)->stud->last_name);
-        if (result < 0) {
-            insert_student_to_names_ordered_db_recursive(&((*head_ref)->left), new_student);
-        } else {
-            insert_student_to_names_ordered_db_recursive(&((*head_ref)->right), new_student);
-        }
-    }
+    free(root);
 }
 
 
@@ -598,3 +606,6 @@ struct names_ordered_studs* delete_node(struct names_ordered_studs* root, struct
 void remove_student_from_students_by_name(struct student* stud) {
     students_by_name = delete_node(students_by_name, stud);
 }
+
+
+
