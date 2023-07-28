@@ -63,10 +63,12 @@ void remove_stud_from_ds(struct student* stud);
 void remove_student_from_students_by_name(struct student* stud);
 void remove_student_from_max_grades(struct student* stud);
 void remove_student_from_school(struct student* stud);
+void edit_student_data();
+void write_students_to_file();
 struct names_ordered_studs* deleteMaxNode(struct names_ordered_studs* root, struct names_ordered_studs* maxNode);
 struct names_ordered_studs* delete_node(struct names_ordered_studs* root, struct student* stud);
 struct names_ordered_studs* getMaxNode(struct names_ordered_studs* root);
-
+struct student* copy_student(struct student* orig);
 
 
 int main() {
@@ -74,6 +76,7 @@ int main() {
     init_DB();
     menu();
     print_students();
+    write_students_to_file();
 
 
     free_students();
@@ -104,6 +107,7 @@ void init_DB() {
             fprintf(stderr,"Memory allocation error!\n");
             free_students();
             free_max_grades();
+            fclose(file);
             exit(1);
         }
 
@@ -268,14 +272,18 @@ void menu(){
                 break;
             case 6:
                 remove_student_by_name();
+                break;
+            case 7:
+                edit_student_data();
+                break;
             default:
                 printf("wrong option\n");
         }
         printf("please input your option:"
                "\n\t0: exit \n\t1: register a new student\n\t2: get excellent students from school"
                "\n\t3: get candidates to kick out (worst students), \n\t4: Calculate for every class in school"
-               "\n\t5: Find a student by name\n\t6: Remove a student from school by name\n. Your option: ");
-
+               "\n\t5: Find a student by name\n\t6: Remove a student from school by name"
+                "\n\t7: Edit a student's data\n. Your option: ");
         scanf("%d", &option);
     }
     printf("goodbye, see you around\n");
@@ -492,8 +500,6 @@ void remove_stud_from_ds(struct student* stud){
     remove_student_from_max_grades(stud);
     remove_student_from_students_by_name(stud);
     remove_student_from_school(stud);
-
-
 }
 
 void remove_student_from_max_grades(struct student* stud){
@@ -529,7 +535,6 @@ void remove_student_from_school(struct student* wanted_stud) {
 
     while (stud != NULL){
         if (stud == wanted_stud){
-            printf("FOUND IT!!");
             if (prev == NULL){
                 prev = stud;
                 school_data.DB[wanted_stud->level-1][wanted_stud->class-1] = stud->next;
@@ -607,5 +612,112 @@ void remove_student_from_students_by_name(struct student* stud) {
     students_by_name = delete_node(students_by_name, stud);
 }
 
+void write_students_to_file() {
+    FILE* file = fopen("students_data_out.txt", "w");
+    if (file == NULL) {
+        printf("Error opening file!\n");
+        return;
+    }
+
+    for (int level = 0; level < NUM_LEVELS; level++) {
+        for (int class = 0; class < NUM_CLASSES; class++) {
+            struct student* current = school_data.DB[level][class];
+            while (current != NULL) {
+                fprintf(file, "%s %s %s %d %d", current->first_name, current->last_name, current->cellphone, current->level, current->class);
+                for (int i = 0; i < NUM_COURSES; i++) {
+                    fprintf(file, " %d", current->courses[i]);
+                }
+                fprintf(file, "\n");
+
+                current = current->next;
+            }
+        }
+    }
+
+    fclose(file);
+}
+
+void edit_student_data() {
+    struct student* found_student = find_student_by_name();
+    if (found_student){
+
+        printf("Which field would you like to edit?\n");
+        printf("1. First name\n");
+        printf("2. Last name\n");
+        printf("3. Cellphone\n");
+        printf("4. Level\n");
+        printf("5. Class\n");
+        printf("6. Grades\n");
+
+        int option;
+        scanf("%d", &option);
+
+        switch(option) {
+            case 1:
+                printf("Enter new first name: ");
+                scanf("%s", found_student->first_name);
+                break;
+            case 2:
+                printf("Enter new last name: ");
+                scanf("%s", found_student->last_name);
+                break;
+            case 3:
+                printf("Enter new cellphone: ");
+                scanf("%s", found_student->cellphone);
+                break;
+            case 4:
+                printf("Enter new level: ");
+                scanf("%d", &found_student->level);
+                break;
+            case 5:
+                printf("Enter new class: ");
+                scanf("%d", &found_student->class);
+                break;
+            case 6:
+                printf("Enter new grades: ");
+                for(int i = 0; i < NUM_COURSES; i++) {
+                    scanf("%d", &found_student->courses[i]);
+                }
+
+                double sum = 0;
+                for(int i = 0; i < NUM_COURSES; i++) {
+                    sum += found_student->courses[i];
+                }
+                found_student->avg = sum / NUM_COURSES;
+                break;
+            default:
+                printf("Invalid option\n");
+                return;
+        }
+
+        struct student* student_edited = copy_student(found_student);
+        remove_stud_from_ds(found_student);
+        insert_student_to_school(student_edited);
+        insert_student_to_list_of_grades(student_edited);
+        insert_student_to_names_ordered_db_recursive(&students_by_name, student_edited);
+    }
+}
 
 
+struct student* copy_student(struct student* orig) {
+    struct student* copy = (struct student*)malloc(sizeof(struct student));
+    if (copy == NULL) {
+        printf("Memory allocation error!\n");
+        exit(1);
+    }
+
+    strcpy(copy->first_name, orig->first_name);
+    strcpy(copy->last_name, orig->last_name);
+    strcpy(copy->cellphone, orig->cellphone);
+    copy->level = orig->level;
+    copy->class = orig->class;
+    for (int i = 0; i < NUM_COURSES; i++) {
+        copy->courses[i] = orig->courses[i];
+    }
+    copy->avg = orig->avg;
+
+    copy->next = NULL;
+    copy->prev = NULL;
+
+    return copy;
+}
